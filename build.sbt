@@ -38,7 +38,7 @@ lazy val commonSettings = {
   ).reduceLeft(_ ++ _)
 }
 
-lazy val zioVersion = "2.0.7"
+lazy val zioVersion = "2.0.8"
 lazy val circeVersion = "0.14.4"
 lazy val http4sVersion = "0.23.18"
 
@@ -46,7 +46,7 @@ lazy val dependencies = Seq(
   libraryDependencies ++= Seq(
     "dev.zio" %% "zio" % zioVersion,
     "dev.zio" %% "zio-streams" % zioVersion,
-    "dev.zio" %% "zio-kafka" % zioVersion,
+    "dev.zio" %% "zio-kafka" % "2.0.7",
     "dev.zio" %% "zio-interop-cats" % "23.0.0.1",
     "io.circe" %% "circe-generic" % circeVersion,
     "io.circe" %% "circe-literal" % circeVersion,

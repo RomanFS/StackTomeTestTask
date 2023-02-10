@@ -3,11 +3,18 @@ package stack.tome.task
 import zio._
 
 object Main extends ZIOAppDefault {
-  lazy val run = ???
+  lazy val run =
+    Program
+      .live
+      .provide(
+        ReviewsService.layer,
+        TrafficService.layer,
+        HttpClient.layer,
+      )
 
   // TODO list:
-  //  - pull reviews for each domain from a category page (don't forget to get domain name)
-  //  - pull top 10 domains (by new reviews) traffic data
+  //  + pull reviews for each domain from a category page (don't forget to get domain name)
+  //  +- pull top 10 domains (by new reviews) traffic data
   //  - update reviews count for each domain
   //  - load saved reviews counts (from file/DB)
   //  - response data will be a sorted list (by new reviews count or traffic[low priority]) of domains (max 10 domains)
