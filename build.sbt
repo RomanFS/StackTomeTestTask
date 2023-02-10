@@ -38,7 +38,7 @@ lazy val commonSettings = {
   ).reduceLeft(_ ++ _)
 }
 
-lazy val zioVersion = "2.0.6"
+lazy val zioVersion = "2.0.7"
 lazy val circeVersion = "0.14.4"
 lazy val http4sVersion = "0.23.18"
 
@@ -50,6 +50,7 @@ lazy val dependencies = Seq(
     "dev.zio" %% "zio-interop-cats" % "23.0.0.1",
     "io.circe" %% "circe-generic" % circeVersion,
     "io.circe" %% "circe-literal" % circeVersion,
+    "io.circe" %% "circe-parser" % circeVersion,
     "org.http4s" %% "http4s-dsl" % http4sVersion,
     "org.http4s" %% "http4s-ember-server" % http4sVersion,
     "org.http4s" %% "http4s-ember-client" % http4sVersion,
