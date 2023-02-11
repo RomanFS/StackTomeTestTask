@@ -12,13 +12,13 @@ import scala.util.chaining.scalaUtilChainingOps
 
 // TODO: add config
 trait ReviewsService {
-  def getReviewsData: ZIO[Any, Throwable, Vector[(String, Either[ParsingFailure, List[Json]])]]
+  def getReviewsData: ZIO[Any, Throwable, Vector[(String, Vector[Json])]]
 
 }
 
 object ReviewsService {
-  lazy val layer: ZLayer[HttpClient, Nothing, ReviewsService] =
-    ZLayer.fromFunction((client: HttpClient) =>
+  lazy val layer: ZLayer[HttpService, Nothing, ReviewsService] =
+    ZLayer.fromFunction((client: HttpService) =>
       new ReviewsService {
         private lazy val domainsRequest = Request[Task](
           method = Method.GET,
@@ -26,14 +26,14 @@ object ReviewsService {
           headers = Headers(),
         )
 
-        private def recentReviewsRequest(reviewsId: String) = Request[Task](
+        private def recentReviewsRequest(reviewsId: String): Request[Task] = Request[Task](
           method = Method.GET,
           uri = (uri"https://www.trustpilot.com/api/categoriespages/" / reviewsId
             / Uri.Path.Segment("reviews")).withQueryParam("locale", "en-US"),
           headers = Headers(),
         )
 
-        private def parseDomainsData =
+        private def parseDomainsData: Task[Iterator[(String, String)]] =
           client(
             _.expect[String](domainsRequest)
               .map(
@@ -47,39 +47,42 @@ object ReviewsService {
               )
           )
 
-        private def parseReviewsData(reviewsId: String) =
+        private def parseReviewsData(reviewsId: String): Task[Either[ParsingFailure, Vector[Json]]] =
           client(
             _.expect[String](recentReviewsRequest(reviewsId))
               .map(
                 _.pipe(parse)
                   .map(_ \\ "reviews")
-                  .map(_.headOption.flatMap(_.asArray).toList.flatten)
+                  .map(_.headOption.flatMap(_.asArray).toVector.flatten)
               )
           )
 
-        override def getReviewsData: ZIO[Any, Throwable, Vector[(String, Either[ParsingFailure, List[Json]])]] =
+        override def getReviewsData: ZIO[Any, Throwable, Vector[(String, Vector[Json])]] =
           for {
             domains <- parseDomainsData
-            result <- domains
-              .take(3) // TODO: remove it or change to maxDomains
-              .map {
-                // TODO: send to kafka
-                case (domain, reviewsId) =>
-                  parseReviewsData(reviewsId)
-                    .map(domain -> _)
-              }
-              .toVector
-              .sequence
-              .map(_.tap(println))
+            result <- ZIO.absolve(
+              domains
+                .take(3) // TODO: remove it or change to maxDomains
+                .map {
+                  // TODO: send to kafka
+                  case (domain, reviewsId) =>
+                    parseReviewsData(reviewsId)
+                      .map(_.leftMap(_.message).leftMap(new Throwable(_)))
+                      .map(_.map(domain -> _))
+                }
+                .toVector
+                .sequence
+                .map(_.sequence)
+            )
           } yield result
 
       }
     )
 
-  lazy val fakeLayer: ZLayer[HttpClient, Nothing, ReviewsService] =
-    ZLayer.fromFunction((_: HttpClient) =>
+  lazy val fakeLayer: ZLayer[HttpService, Nothing, ReviewsService] =
+    ZLayer.fromFunction((_: HttpService) =>
       new ReviewsService {
-        override def getReviewsData: ZIO[Any, Throwable, Vector[(String, Either[ParsingFailure, List[Json]])]] =
+        override def getReviewsData: ZIO[Any, Throwable, Vector[(String, Vector[Json])]] =
           ZIO.succeed(Vector())
 
       }

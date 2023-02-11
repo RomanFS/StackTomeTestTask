@@ -1,13 +1,18 @@
 package stack.tome.task
 
-import cats.implicits._
-import zio.interop.catz._
+import zio._
 
 object Program {
-  lazy val live =
-    for {
-      reviewsData <- ReviewsService.getReviewsData
-      trafficForEachDomain <- reviewsData.map(_._1).map(TrafficService.getDomainTraffic).sequence
-    } yield () // TODO: map data and implement other functional
+  lazy val make =
+    ZIO
+      .service[Controller]
+      .provide(
+        Controller.make,
+        ReviewsService.layer,
+        TrafficService.fakeLayer, // TODO: change to the real layer
+        HttpService.live,
+        ReviewsCounterService.layer,
+        DBService.fake, // TODO: change to the real layer
+      )
 
 }

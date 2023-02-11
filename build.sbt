@@ -54,5 +54,6 @@ lazy val dependencies = Seq(
     "org.http4s" %% "http4s-dsl" % http4sVersion,
     "org.http4s" %% "http4s-ember-server" % http4sVersion,
     "org.http4s" %% "http4s-ember-client" % http4sVersion,
+    "dev.profunktor" %% "redis4cats-effects" % "1.4.0",
   )
 )

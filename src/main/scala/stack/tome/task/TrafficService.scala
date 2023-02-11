@@ -14,8 +14,8 @@ trait TrafficService {
 }
 
 object TrafficService {
-  lazy val layer: ZLayer[HttpClient, Nothing, TrafficService] =
-    ZLayer.fromFunction((client: HttpClient) =>
+  lazy val layer: ZLayer[HttpService, Nothing, TrafficService] =
+    ZLayer.fromFunction((client: HttpService) =>
       new TrafficService {
         private def trafficRequest(domain: String): Request[Task] =
           Request[Task](
@@ -42,10 +42,10 @@ object TrafficService {
       }
     )
 
-  lazy val fakeLayer: ZLayer[HttpClient, Nothing, TrafficService] =
+  lazy val fakeLayer: ZLayer[HttpService, Nothing, TrafficService] =
     ZLayer.fromZIO(
       ZIO
-        .service[HttpClient]
+        .service[HttpService]
         .map(_ =>
           new TrafficService {
             override def getDomainTraffic(domain: String): Task[Option[RuntimeFlags]] = ZIO.succeed(Some(666))
