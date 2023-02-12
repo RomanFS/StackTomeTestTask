@@ -10,9 +10,9 @@ object Program {
         Controller.make,
         ReviewsService.layer,
         TrafficService.fakeLayer, // TODO: change to the real layer
-        HttpService.live,
         ReviewsCounterService.layer,
-        DBService.fake, // TODO: change to the real layer
+        HttpClientService.live,
+        ReviewCountsDBService.redisLive,
       )
 
 }

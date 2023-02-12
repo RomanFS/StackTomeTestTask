@@ -6,20 +6,24 @@ import zio._
 import zio.interop.catz._
 
 // TODO: add config
-trait HttpService {
+trait HttpClientService {
   def apply[A](f: Client[Task] => Task[A]): Task[A]
+
 }
 
-object HttpService {
+object HttpClientService {
   lazy val live =
     ZLayer.scoped(
       EmberClientBuilder
         .default[Task]
         .build
         .toScopedZIO
-        .map(client => new HttpService {
-          override def apply[A](f: Client[Task] => Task[A]): Task[A] = f(client)
-        })
+        .map(client =>
+          new HttpClientService {
+            override def apply[A](f: Client[Task] => Task[A]): Task[A] = f(client)
+
+          }
+        )
     )
 
 }

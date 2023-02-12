@@ -6,17 +6,19 @@ import dev.profunktor.redis4cats.{ Redis, RedisCommands }
 import zio._
 import zio.interop.catz._
 
-trait DBService {
+import scala.util.chaining.scalaUtilChainingOps
+
+trait ReviewCountsDBService {
   def storeReviewCounts(reviewCounts: Vector[(String, Int)]): Task[Unit]
   def getReviewCounts: Task[Vector[(String, Int)]]
 
 }
 
-object DBService {
-  lazy val redisLive: ZLayer[Any, Throwable, RedisService] =
-    ZLayer.scoped(Redis[Task].utf8("redis://localhost").toScopedZIO.map(RedisService.apply))
+object ReviewCountsDBService {
+  lazy val redisLive: ZLayer[Any, Throwable, RedisReviewCountsService] =
+    ZLayer.scoped(Redis[Task].utf8("redis://localhost").toScopedZIO.map(RedisReviewCountsService.apply))
 
-  lazy val fake: ULayer[DBService] = ZLayer.succeed(new DBService {
+  lazy val fake: ULayer[ReviewCountsDBService] = ZLayer.succeed(new ReviewCountsDBService {
     override def storeReviewCounts(reviewCounts: Vector[(String, Int)]): Task[Unit] = ZIO.unit
 
     override def getReviewCounts: Task[Vector[(String, Int)]] = ZIO.succeed(Vector(("someDomain", 1)))
@@ -25,9 +27,10 @@ object DBService {
 
 }
 
-case class RedisService(redis: RedisCommands[Task, String, String]) extends DBService {
+case class RedisReviewCountsService(redis: RedisCommands[Task, String, String]) extends ReviewCountsDBService {
   override def storeReviewCounts(reviewCounts: Vector[(String, Int)]): Task[Unit] =
     reviewCounts
+      .tap(r => println(s"storeReviewCounts: $r"))
       .map {
         case (domain, count) => redis.set(domain, count.toString)
       }
@@ -40,6 +43,6 @@ case class RedisService(redis: RedisCommands[Task, String, String]) extends DBSe
       keys <- redis.scan.map(_.keys.toVector)
       _ = println("must not appear twice")
       values <- keys.map(redis.get).sequence
-    } yield (keys zip values).map(r => r._1 -> r._2.map(_.toInt).getOrElse(0))
+    } yield (keys zip values).map(r => r._1 -> r._2.map(_.toInt).getOrElse(0)).tap(r => println(s"getReviewCounts: $r"))
 
 }
