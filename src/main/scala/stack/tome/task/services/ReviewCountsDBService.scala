@@ -1,8 +1,8 @@
-package stack.tome.task
+package stack.tome.task.services
 
 import cats.implicits._
 import dev.profunktor.redis4cats.effect.Log.Stdout._
-import dev.profunktor.redis4cats.{ Redis, RedisCommands }
+import dev.profunktor.redis4cats.{Redis, RedisCommands}
 import zio._
 import zio.interop.catz._
 

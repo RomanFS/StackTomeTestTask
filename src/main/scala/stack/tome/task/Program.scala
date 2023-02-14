@@ -1,5 +1,6 @@
 package stack.tome.task
 
+import stack.tome.task.services._
 import zio._
 
 object Program {

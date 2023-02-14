@@ -1,4 +1,4 @@
-package stack.tome.task
+package stack.tome.task.models
 
 import java.time.ZonedDateTime
 

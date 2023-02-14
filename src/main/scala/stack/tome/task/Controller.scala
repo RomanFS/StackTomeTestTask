@@ -1,10 +1,11 @@
 package stack.tome.task
 
 import cats.implicits._
+import stack.tome.task.services.{HttpService, ReviewCountsDBService, ReviewsCounterService, ReviewsService, TrafficService}
 import zio._
 import zio.interop.catz._
 
-import java.time.{ Clock, _ }
+import java.time.{Clock, _}
 
 case class Controller(
     httpService: HttpService,

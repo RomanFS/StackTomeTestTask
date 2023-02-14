@@ -1,4 +1,4 @@
-package stack.tome.task
+package stack.tome.task.services
 
 import cats.implicits._
 import io.circe._
@@ -6,6 +6,7 @@ import io.circe.generic.auto._
 import io.circe.parser._
 import org.http4s._
 import org.http4s.implicits.http4sLiteralsSyntax
+import stack.tome.task.models.Review
 import zio._
 import zio.interop.catz._
 

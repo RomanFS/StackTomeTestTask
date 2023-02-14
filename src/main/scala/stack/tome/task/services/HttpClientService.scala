@@ -1,4 +1,4 @@
-package stack.tome.task
+package stack.tome.task.services
 
 import org.http4s.client.Client
 import org.http4s.ember.client.EmberClientBuilder

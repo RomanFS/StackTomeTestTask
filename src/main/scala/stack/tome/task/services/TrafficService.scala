@@ -1,4 +1,4 @@
-package stack.tome.task
+package stack.tome.task.services
 
 import org.http4s._
 import org.http4s.implicits.http4sLiteralsSyntax
