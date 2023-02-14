@@ -3,11 +3,12 @@ package stack.tome.task
 import zio._
 
 object Program {
-  lazy val make =
+  lazy val start =
     ZIO
-      .service[Controller]
+      .serviceWithZIO[Controller](_.start)
       .provide(
         Controller.make,
+        HttpService.make,
         ReviewsService.layer,
         TrafficService.fakeLayer, // TODO: change to the real layer
         ReviewsCounterService.layer,

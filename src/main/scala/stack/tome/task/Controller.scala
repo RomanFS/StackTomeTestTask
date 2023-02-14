@@ -7,6 +7,7 @@ import zio.interop.catz._
 import java.time.{ Clock, _ }
 
 case class Controller(
+    httpService: HttpService,
     reviewsService: ReviewsService,
     trafficService: TrafficService,
     reviewsCounterService: ReviewsCounterService,
@@ -14,23 +15,16 @@ case class Controller(
 ) {
   // TODO: change to a proper date value
   lazy val startTime =
-    ZonedDateTime.now(Clock.systemUTC()).minus(3.minutes)
+    ZonedDateTime.now(Clock.systemUTC()).minus(3.days)
 
   lazy val start =
-    (for {
-      _ <- retrieveDomainData(startTime.some).repeat(Schedule.fixed(3.minutes)) // TODO: use config value
-      combinedCounts <- reviewsCounterService.getAll <&> reviewCountsDBService.getReviewCounts
-    } yield {
-      val (newReviewCounts, storedReviewCounts) = combinedCounts
-
-      newReviewCounts.map {
-        case (domain, newCount) =>
-          storedReviewCounts.find(_._1 == domain) match {
-            case Some((_, storedCount)) => (domain, storedCount + newCount)
-            case None => (domain, newCount)
-          }
-      }
-    }).flatMap(reviewCountsDBService.storeReviewCounts)
+    // TODO: use config value for scheduling
+    (httpService.start <&> retrieveDomainData(startTime.some).repeat(Schedule.fixed(10.seconds))).ensuring(
+      reviewsCounterService
+        .getAll
+        .flatMap(reviewCountsDBService.storeReviewCounts)
+        .orDie
+    )
 
   private def retrieveDomainData(from: Option[ZonedDateTime] = None) =
     for {

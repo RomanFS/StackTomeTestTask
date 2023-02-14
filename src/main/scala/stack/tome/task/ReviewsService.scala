@@ -95,7 +95,7 @@ object ReviewsService {
         override def getReviewsData(
             from: Option[ZonedDateTime] = None
         ): ZIO[Any, Throwable, Vector[(String, Vector[Review])]] =
-          ZIO.succeed(Vector())
+          ZIO.succeed(Vector()).map(_.tap(_ => println("Fake Reviews Service is used")))
 
       }
     )
