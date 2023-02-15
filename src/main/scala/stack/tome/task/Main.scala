@@ -21,11 +21,12 @@ object Main extends ZIOAppDefault {
   //  + service has to pull data every 5 minutes
   //  + on service termination (or job completion) save reviews counts
   //  + add basic http server to handle a data request
+  //  - error handling
 
   // config:
-  //  - session token
-  //  - domain amount per request (default: 10)
-  //  - update interval (default: 5 minutes)
+  //  + session token
+  //  + domain amount per request (default: 10)
+  //  + update interval (default: 5 minutes)
 
   // optional:
   //  - use kafka

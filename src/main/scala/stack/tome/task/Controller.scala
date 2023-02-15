@@ -3,7 +3,7 @@ package stack.tome.task
 import cats.implicits._
 import stack.tome.task.models._
 import stack.tome.task.services._
-import zio._
+import zio.{ Duration => ZDuration, _ }
 import zio.interop.catz._
 
 import java.time.{ Clock, _ }
@@ -14,15 +14,15 @@ case class Controller(
     trafficService: TrafficService,
     domainsService: DomainsService,
     domainsDBService: DomainsDBService,
+    configService: ConfigService,
 ) {
-  // TODO: change to a proper date value
   def startTime =
-    ZonedDateTime.now(Clock.systemUTC()).minus(5.days) // TODO: change it to a config value
+    ZonedDateTime.now(Clock.systemUTC()).minus(Duration.ofMillis(configService.updateInterval.toMillis))
 
   lazy val start =
     ( // start http service and schedule job for the Domain data gathering
       httpService.start <&> collectAndStoreDomainsData(startTime.some)
-        .repeat(Schedule.fixed(5.minutes)) // TODO: use config value for scheduling
+        .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
     ).ensuring(
       // save data on program exit
       domainsService

@@ -13,16 +13,16 @@ trait TrafficService {
 }
 
 object TrafficService {
-  lazy val layer: ZLayer[HttpClientService, Nothing, TrafficService] =
-    ZLayer.fromFunction((client: HttpClientService) =>
+  lazy val layer: ZLayer[HttpClientService with ConfigService, Nothing, TrafficService] =
+    ZLayer.fromFunction((client: HttpClientService, config: ConfigService) =>
       new TrafficService {
         private def trafficRequest(domain: String): Request[Task] =
           Request[Task](
             method = Method.GET,
-            uri = uri"https://web.vstat.info/" / domain,
+            uri = uri"https://" / config.trafficConfig.trafficDomain / domain,
             headers = Headers(
-              "authority" -> "web.vstat.info",
-              "cookie" -> "", // TODO: get it from config
+              "authority" -> config.trafficConfig.trafficDomain,
+              "cookie" -> config.trafficConfig.sessionToken,
             ),
           )
 

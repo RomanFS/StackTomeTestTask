@@ -20,18 +20,22 @@ trait ReviewsService {
 }
 
 object ReviewsService {
-  lazy val layer: ZLayer[HttpClientService, Nothing, ReviewsService] =
-    ZLayer.fromFunction((client: HttpClientService) =>
+  lazy val layer: ZLayer[HttpClientService with ConfigService, Nothing, ReviewsService] =
+    ZLayer.fromFunction((client: HttpClientService, config: ConfigService) =>
       new ReviewsService {
         private lazy val domainsRequest = Request[Task](
           method = Method.GET,
-          uri = uri"https://www.trustpilot.com/categories/jewelry_store?sort=latest_review",
+          uri = Uri.fromString(config.reviewsConfig.domainsUrl) match {
+            case Left(value) => println(value)
+              uri"http://localhost/"
+            case Right(value) => value
+          },
           headers = Headers(),
         )
 
         private def recentReviewsRequest(reviewsId: String): Request[Task] = Request[Task](
           method = Method.GET,
-          uri = (uri"https://www.trustpilot.com/api/categoriespages/" / reviewsId
+          uri = (Uri.unsafeFromString(config.reviewsConfig.reviewsUrl) / reviewsId
             / Uri.Path.Segment("reviews")).withQueryParam("locale", "en-US"),
           headers = Headers(),
         )
@@ -67,7 +71,7 @@ object ReviewsService {
             domains <- parseDomainsData
             result <- ZIO.absolve(
               domains
-                /*.take(10)*/ // TODO: remove it or change to maxDomains
+                .take(config.maxDomainResponse)
                 .toVector
                 .flatTraverse {
                   case (domain, reviewsId) =>

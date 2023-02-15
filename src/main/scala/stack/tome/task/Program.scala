@@ -10,8 +10,9 @@ object Program {
       .provide(
         Controller.make,
         HttpService.make,
+        ConfigService.layer,
         ReviewsService.layer,
-        TrafficService.fakeLayer, // TODO: change to the real layer
+        TrafficService.layer,
         DomainsService.layer,
         HttpClientService.live,
         DomainsDBService.redisLive,

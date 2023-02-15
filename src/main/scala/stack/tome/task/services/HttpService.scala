@@ -12,7 +12,8 @@ import stack.tome.task.models._
 import zio._
 import zio.interop.catz._
 
-case class HttpService(domainsService: DomainsService, domainsDBService: DomainsDBService) extends Http4sDsl[Task] {
+case class HttpService(domainsService: DomainsService, domainsDBService: DomainsDBService, config: ConfigService)
+    extends Http4sDsl[Task] {
   private lazy val helloWorldService = HttpRoutes
     .of[Task] {
       case GET -> Root / "domains" =>
@@ -55,7 +56,7 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
               .sortWith {
                 case (d1, d2) => d1.domain.compareReviewsDates(d2.domain)
               }
-              .take(10) // TODO: use config value
+              .take(config.maxDomainResponse)
               .asJson
               .noSpaces
           )

@@ -7,12 +7,10 @@ import dev.profunktor.redis4cats.{ Redis, RedisCommands }
 import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
+import stack.tome.task.DurationOps
 import stack.tome.task.models._
 import zio._
 import zio.interop.catz._
-
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 
 trait DomainsDBService {
   def storeDomains(newReviewCounts: Vector[Domain]): Task[Unit]
@@ -23,8 +21,11 @@ trait DomainsDBService {
 }
 
 object DomainsDBService {
-  lazy val redisLive: ZLayer[Any, Throwable, RedisDomainsService] =
-    ZLayer.scoped(Redis[Task].utf8("redis://localhost").toScopedZIO.map(RedisDomainsService.apply))
+  lazy val redisLive: ZLayer[ConfigService, Throwable, RedisDomainsService] =
+    ZLayer.scoped(for {
+      redis <- Redis[Task].utf8("redis://localhost").toScopedZIO
+      config <- ZIO.service[ConfigService]
+    } yield RedisDomainsService(redis, config))
 
   lazy val fake: ULayer[DomainsDBService] = ZLayer.succeed(new DomainsDBService {
     println("Fake ReviewCountsDBService is used")
@@ -43,7 +44,8 @@ object DomainsDBService {
 
 }
 
-case class RedisDomainsService(redis: RedisCommands[Task, String, String]) extends DomainsDBService {
+case class RedisDomainsService(redis: RedisCommands[Task, String, String], config: ConfigService)
+    extends DomainsDBService {
   private val trafficKeyPostfix = "_traffic"
 
   override def storeDomains(newDomains: Vector[Domain]): Task[Unit] =
@@ -80,8 +82,8 @@ case class RedisDomainsService(redis: RedisCommands[Task, String, String]) exten
           redis.set(
             domain + trafficKeyPostfix,
             traffic.toString,
-            SetArgs(ex = SetArg.Existence.Nx, ttl = SetArg.Ttl.Ex(FiniteDuration(1, TimeUnit.HOURS))),
-          ) // TODO: use the config value if needed
+            SetArgs(ex = SetArg.Existence.Nx, ttl = SetArg.Ttl.Ex(config.trafficConfig.trafficExpiration.toFinite)),
+          )
       }
       .as(ZIO.unit)
 
