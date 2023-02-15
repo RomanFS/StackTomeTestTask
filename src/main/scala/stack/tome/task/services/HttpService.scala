@@ -1,5 +1,6 @@
 package stack.tome.task.services
 
+import cats.implicits._
 import com.comcast.ip4s._
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -7,7 +8,7 @@ import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server._
 import org.http4s.implicits._
-import stack.tome.task.models.Domain
+import stack.tome.task.models._
 import zio._
 import zio.interop.catz._
 
@@ -20,19 +21,44 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
     .orNotFound
 
   private def getResponse =
-    (domainsService.getAll <&> domainsDBService.getDomains).map {
+    (domainsService.getAll <&> domainsDBService.getDomains).flatMap {
       case (newDomains, storedDomains) =>
-        newDomains
+        val domains = newDomains
           .map {
             case domain @ Domain(name, newInfo) =>
-              storedDomains.find(_.name == name) match {
+              val domainTotal = storedDomains.find(_.name == name) match {
                 case Some(Domain(_, oldInfo)) =>
-                  domain.copy(info = oldInfo.copy(oldInfo.reviewsCount + newInfo.reviewsCount, newInfo.newestReview))
+                  domain.copy(info =
+                    oldInfo.copy(
+                      oldInfo.reviewsCount + newInfo.reviewsCount,
+                      newInfo.newestReview orElse oldInfo.newestReview,
+                    )
+                  )
                 case None => domain
               }
+
+              val reviewResponse = domainTotal
+                .info
+                .newestReview
+                .map(review => ReviewResponse(review.id, review.text, review.date.createdAt))
+
+              DomainResponse(name, newInfo.reviewsCount, domainTotal.info.reviewsCount, reviewResponse)
           }
-          .asJson
-          .noSpaces
+
+        domainsDBService
+          .getDomainsTraffic(domains.map(_.name))
+          .map(
+            _.flatMap {
+              case (domainName, traffic) => domains.find(_.name == domainName).map(DomainWithTraffic(_, traffic))
+            }
+              .sortBy(_.traffic)
+              .sortWith {
+                case (d1, d2) => d1.domain.compareReviewsDates(d2.domain)
+              }
+              .take(10) // TODO: use config value
+              .asJson
+              .noSpaces
+          )
     }
 
   lazy val start =

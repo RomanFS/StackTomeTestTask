@@ -4,7 +4,6 @@ import stack.tome.task.models.{ Domain, DomainInfo }
 import zio._
 
 import scala.collection.mutable
-import scala.util.chaining.scalaUtilChainingOps
 
 trait DomainsService {
   def getAll: Task[Vector[Domain]]
@@ -21,13 +20,7 @@ object DomainsService {
         .map(reviewCountsRef =>
           new DomainsService {
             override def getAll: Task[Vector[Domain]] =
-              reviewCountsRef
-                .get
-                .map(
-                  _.toVector
-                    .map(r => Domain(r._1, r._2))
-                    .tap(r => println(s"ReviewsCounterService.getAll: $r"))
-                )
+              reviewCountsRef.get.map(_.toVector.map(r => Domain(r._1, r._2)))
 
             override def addOrSet(newDomainInfo: Domain): Task[Unit] =
               for {
@@ -36,7 +29,7 @@ object DomainsService {
                   val newInfo = storedValue
                     .copy(
                       storedValue.reviewsCount + newDomainInfo.info.reviewsCount,
-                      newDomainInfo.info.newestReview orElse storedValue.newestReview
+                      newDomainInfo.info.newestReview orElse storedValue.newestReview,
                     )
                   reviewCounts.put(newDomainInfo.name, newInfo)
                   reviewCounts

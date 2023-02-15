@@ -67,7 +67,7 @@ object ReviewsService {
             domains <- parseDomainsData
             result <- ZIO.absolve(
               domains
-                .take(5) // TODO: remove it or change to maxDomains
+                /*.take(10)*/ // TODO: remove it or change to maxDomains
                 .toVector
                 .flatTraverse {
                   case (domain, reviewsId) =>
@@ -86,7 +86,7 @@ object ReviewsService {
                 }
                 .map(_.sequence)
             )
-          } yield result.tap(r => println(s"getReviewsData: $r"))
+          } yield result
 
       }
     )

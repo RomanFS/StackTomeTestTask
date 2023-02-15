@@ -1,11 +1,10 @@
 package stack.tome.task.services
 
+import cats.implicits._
 import org.http4s._
 import org.http4s.implicits.http4sLiteralsSyntax
 import zio._
 import zio.interop.catz._
-
-import scala.util.chaining.scalaUtilChainingOps
 
 // TODO: add config
 trait TrafficService {
@@ -35,7 +34,6 @@ object TrafficService {
                   .r
                   .findFirstIn(_)
                   .flatMap(_.toIntOption)
-                  .tap(r => println(s"$domain $r"))
               )
           )
 
@@ -50,7 +48,7 @@ object TrafficService {
           println("Fake TrafficService is used")
 
           override def getDomainTraffic(domain: String): Task[Option[RuntimeFlags]] =
-            ZIO.succeed(Some(666))
+            Random.nextIntBetween(1000, 10000).map(_.some)
 
         })
     )

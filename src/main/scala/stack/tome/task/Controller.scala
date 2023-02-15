@@ -17,13 +17,14 @@ case class Controller(
 ) {
   // TODO: change to a proper date value
   def startTime =
-    ZonedDateTime.now(Clock.systemUTC()).minus(5.minutes)
+    ZonedDateTime.now(Clock.systemUTC()).minus(5.days) // TODO: change it to a config value
 
   lazy val start =
     ( // start http service and schedule job for the Domain data gathering
       httpService.start <&> collectAndStoreDomainsData(startTime.some)
         .repeat(Schedule.fixed(5.minutes)) // TODO: use config value for scheduling
     ).ensuring(
+      // save data on program exit
       domainsService
         .getAll
         .flatMap(domainsDBService.storeDomains)
@@ -33,10 +34,12 @@ case class Controller(
   private def collectAndStoreDomainsData(from: => Option[ZonedDateTime] = None) =
     for {
       reviews <- reviewsService.getReviewsData(from)
-      domainTrafficRequest = reviews
+      domainTrafficUpdate = reviews
         .map(_._1)
+        .distinct
         .traverse(domain => trafficService.getDomainTraffic(domain).map(_.getOrElse(0)).map(domain -> _))
-      stateUpdate = reviews
+        .flatMap(domainsDBService.storeDomainTraffic)
+      domainsUpdate = reviews
         .groupBy(_._1)
         .toVector
         .traverse {
@@ -51,9 +54,8 @@ case class Controller(
               )
             )
         }
-      // TODO: save traffic data
-      domainTrafficData <- domainTrafficRequest <& stateUpdate
-    } yield domainTrafficData
+      _ <- domainTrafficUpdate <&> domainsUpdate
+    } yield ()
 
 }
 
