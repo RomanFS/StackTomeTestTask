@@ -1,48 +1,58 @@
 package stack.tome.task
 
 import cats.implicits._
-import stack.tome.task.services.{HttpService, ReviewCountsDBService, ReviewsCounterService, ReviewsService, TrafficService}
+import stack.tome.task.models._
+import stack.tome.task.services._
 import zio._
 import zio.interop.catz._
 
-import java.time.{Clock, _}
+import java.time.{ Clock, _ }
 
 case class Controller(
     httpService: HttpService,
     reviewsService: ReviewsService,
     trafficService: TrafficService,
-    reviewsCounterService: ReviewsCounterService,
-    reviewCountsDBService: ReviewCountsDBService,
+    domainsService: DomainsService,
+    domainsDBService: DomainsDBService,
 ) {
   // TODO: change to a proper date value
-  lazy val startTime =
-    ZonedDateTime.now(Clock.systemUTC()).minus(3.days)
+  def startTime =
+    ZonedDateTime.now(Clock.systemUTC()).minus(5.minutes)
 
   lazy val start =
-    // TODO: use config value for scheduling
-    (httpService.start <&> retrieveDomainData(startTime.some).repeat(Schedule.fixed(10.seconds))).ensuring(
-      reviewsCounterService
+    ( // start http service and schedule job for the Domain data gathering
+      httpService.start <&> collectAndStoreDomainsData(startTime.some)
+        .repeat(Schedule.fixed(5.minutes)) // TODO: use config value for scheduling
+    ).ensuring(
+      domainsService
         .getAll
-        .flatMap(reviewCountsDBService.storeReviewCounts)
+        .flatMap(domainsDBService.storeDomains)
         .orDie
     )
 
-  private def retrieveDomainData(from: Option[ZonedDateTime] = None) =
+  private def collectAndStoreDomainsData(from: => Option[ZonedDateTime] = None) =
     for {
-      reviewsData <- reviewsService.getReviewsData(from)
-      domainTrafficRequest = reviewsData
+      reviews <- reviewsService.getReviewsData(from)
+      domainTrafficRequest = reviews
         .map(_._1)
-        .map(domain => trafficService.getDomainTraffic(domain).map(domain -> _))
-        .sequence
-      stateUpdate = reviewsData.map {
-        case (domain, reviews) =>
-          // TODO: ignore if no reviews?
-          reviewsCounterService.addOrSet(domain, reviews.size)
-      }.sequence
-      // TODO: move to kafka consumer
-      domainTrafficData <- domainTrafficRequest.map(_.map {
-        case (domain, trafficOp) => domain -> trafficOp.getOrElse(0)
-      }) <& stateUpdate
+        .traverse(domain => trafficService.getDomainTraffic(domain).map(_.getOrElse(0)).map(domain -> _))
+      stateUpdate = reviews
+        .groupBy(_._1)
+        .toVector
+        .traverse {
+          case (domain, domainReviews) =>
+            domainsService.addOrSet(
+              Domain(
+                domain,
+                DomainInfo(
+                  domainReviews.size,
+                  domainReviews.map(_._2).sortBy(-_.date.createdAt.toInstant.toEpochMilli).headOption,
+                ),
+              )
+            )
+        }
+      // TODO: save traffic data
+      domainTrafficData <- domainTrafficRequest <& stateUpdate
     } yield domainTrafficData
 
 }

@@ -12,9 +12,9 @@ object Program {
         HttpService.make,
         ReviewsService.layer,
         TrafficService.fakeLayer, // TODO: change to the real layer
-        ReviewsCounterService.layer,
+        DomainsService.layer,
         HttpClientService.live,
-        ReviewCountsDBService.redisLive,
+        DomainsDBService.redisLive,
       )
 
 }

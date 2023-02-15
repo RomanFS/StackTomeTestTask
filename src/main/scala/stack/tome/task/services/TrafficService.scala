@@ -47,7 +47,10 @@ object TrafficService {
       ZIO
         .service[HttpClientService]
         .as(new TrafficService {
-          override def getDomainTraffic(domain: String): Task[Option[RuntimeFlags]] = ZIO.succeed(Some(666))
+          println("Fake TrafficService is used")
+
+          override def getDomainTraffic(domain: String): Task[Option[RuntimeFlags]] =
+            ZIO.succeed(Some(666))
 
         })
     )

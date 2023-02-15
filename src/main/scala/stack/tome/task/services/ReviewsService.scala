@@ -15,7 +15,7 @@ import scala.util.chaining.scalaUtilChainingOps
 
 // TODO: add config
 trait ReviewsService {
-  def getReviewsData(from: Option[ZonedDateTime] = None): ZIO[Any, Throwable, Vector[(String, Vector[Review])]]
+  def getReviewsData(from: Option[ZonedDateTime] = None): ZIO[Any, Throwable, Vector[(String, Review)]]
 
 }
 
@@ -50,39 +50,40 @@ object ReviewsService {
               )
           )
 
-        private def parseReviewsData(reviewsId: String): Task[Either[ParsingFailure, Vector[Review]]] =
+        private def getReviews(reviewsId: String): Task[Vector[Either[ParsingFailure, Review]]] =
           client(
             _.expect[String](recentReviewsRequest(reviewsId))
               .map(
                 _.pipe(parse)
                   .map(_ \\ "reviews")
-                  .map(_.headOption.flatMap(_.asArray).toVector.flatten.map(_.as[Review].toOption.get))
+                  .traverse(_.headOption.flatMap(_.asArray).toVector.flatten.map(_.as[Review].toOption.get))
               )
           )
 
         override def getReviewsData(
             from: Option[ZonedDateTime] = None
-        ): ZIO[Any, Throwable, Vector[(String, Vector[Review])]] =
+        ): ZIO[Any, Throwable, Vector[(String, Review)]] =
           for {
             domains <- parseDomainsData
             result <- ZIO.absolve(
               domains
-                .take(3) // TODO: remove it or change to maxDomains
-                .map {
-                  // TODO: send to kafka
-                  case (domain, reviewsId) =>
-                    val reviewsData =
-                      parseReviewsData(reviewsId)
-                        .map(_.leftMap(_.message).leftMap(new Throwable(_)))
-
-                    (from match {
-                      case Some(fromDate) =>
-                        reviewsData.map(_.map(_.filter(_.date.createdAt.isAfter(fromDate))))
-                      case None => reviewsData
-                    }).map(_.map(domain -> _))
-                }
+                .take(5) // TODO: remove it or change to maxDomains
                 .toVector
-                .sequence
+                .flatTraverse {
+                  case (domain, reviewsId) =>
+                    getReviews(reviewsId)
+                      .map(_.map(_.leftMap(e => new Throwable(e.message)).map(domain -> _)))
+                }
+                .map { reviewsData =>
+                  from match {
+                    case Some(fromDate) =>
+                      reviewsData.filter(_ match {
+                        case Left(_) => false
+                        case Right((_, review)) => review.date.createdAt.isAfter(fromDate)
+                      })
+                    case None => reviewsData
+                  }
+                }
                 .map(_.sequence)
             )
           } yield result.tap(r => println(s"getReviewsData: $r"))
@@ -93,10 +94,12 @@ object ReviewsService {
   lazy val fakeLayer: ZLayer[HttpClientService, Nothing, ReviewsService] =
     ZLayer.fromFunction((_: HttpClientService) =>
       new ReviewsService {
+        println("Fake Reviews Service is used")
+
         override def getReviewsData(
             from: Option[ZonedDateTime] = None
-        ): ZIO[Any, Throwable, Vector[(String, Vector[Review])]] =
-          ZIO.succeed(Vector()).map(_.tap(_ => println("Fake Reviews Service is used")))
+        ): ZIO[Any, Throwable, Vector[(String, Review)]] =
+          ZIO.succeed(Vector())
 
       }
     )

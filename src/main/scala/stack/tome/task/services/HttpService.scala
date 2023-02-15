@@ -1,15 +1,17 @@
 package stack.tome.task.services
 
 import com.comcast.ip4s._
+import io.circe.generic.auto._
+import io.circe.syntax._
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server._
 import org.http4s.implicits._
+import stack.tome.task.models.Domain
 import zio._
 import zio.interop.catz._
 
-case class HttpService(reviewsCounterService: ReviewsCounterService, reviewCountsDBService: ReviewCountsDBService)
-    extends Http4sDsl[Task] {
+case class HttpService(domainsService: DomainsService, domainsDBService: DomainsDBService) extends Http4sDsl[Task] {
   private lazy val helloWorldService = HttpRoutes
     .of[Task] {
       case GET -> Root / "domains" =>
@@ -18,17 +20,19 @@ case class HttpService(reviewsCounterService: ReviewsCounterService, reviewCount
     .orNotFound
 
   private def getResponse =
-    (reviewsCounterService.getAll <&> reviewCountsDBService.getReviewCounts).map {
-      case (newReviewCounts, storedReviewCounts) =>
-        newReviewCounts
+    (domainsService.getAll <&> domainsDBService.getDomains).map {
+      case (newDomains, storedDomains) =>
+        newDomains
           .map {
-            case (domain, newCount) =>
-              storedReviewCounts.find(_._1 == domain) match {
-                case Some((_, storedCount)) => (domain, newCount, storedCount + newCount)
-                case None => (domain, newCount, newCount)
+            case domain @ Domain(name, newInfo) =>
+              storedDomains.find(_.name == name) match {
+                case Some(Domain(_, oldInfo)) =>
+                  domain.copy(info = oldInfo.copy(oldInfo.reviewsCount + newInfo.reviewsCount, newInfo.newestReview))
+                case None => domain
               }
           }
-          .toString()
+          .asJson
+          .noSpaces
     }
 
   lazy val start =
