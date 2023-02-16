@@ -28,11 +28,11 @@ case class Controller(
           .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
       } yield ()
       ).ensuring(
-      // save data on program exit
-      domainsService
-        .getAll
-        .flatMap(domainsDBService.storeDomains)
-        .orDie
+      (for {
+        domainsData <- domainsService.getAll
+        _ <- domainsDBService.storeDomains(domainsData)
+        _ <- ZIO.logInfo("Collected data was saved to the permanent storage.")
+      } yield ()).orDie
     )
 
   private def collectAndStoreDomainsData(from: => Option[ZonedDateTime] = None) =

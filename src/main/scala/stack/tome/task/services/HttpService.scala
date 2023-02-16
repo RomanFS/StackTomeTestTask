@@ -74,6 +74,7 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
       .withHttpApp(domainsRoute)
       .build
       .use(_ => ZIO.never)
+      .onInterrupt(ZIO.logInfo("HttpService was stopped."))
 
 }
 

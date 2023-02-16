@@ -5,7 +5,7 @@ import zio.logging._
 
 object Main extends ZIOAppDefault {
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
-    Runtime.removeDefaultLoggers >>> console(LogFormat.colored, LogLevel.Debug)
+    Runtime.removeDefaultLoggers >>> console(logLevel = LogLevel.Debug)
 
   lazy val run =
     Program.start
@@ -35,5 +35,5 @@ object Main extends ZIOAppDefault {
   // optional:
   //  - use kafka
   //  - add load balancer for requests to reduce load peaks
-  //  - configure docker to run the project
+  //  + configure docker to run the project
 }

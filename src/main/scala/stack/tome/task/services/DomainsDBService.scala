@@ -23,7 +23,9 @@ trait DomainsDBService {
 object DomainsDBService {
   lazy val redisLive: ZLayer[ConfigService, Throwable, RedisDomainsService] =
     ZLayer.scoped(for {
-      redis <- Redis[Task].utf8("redis://localhost").toScopedZIO
+      host <- System.envOrElse("REDIS_SERVER", "localhost")
+      _ <- ZIO.logDebug(s"Using host = $host, for redis.")
+      redis <- Redis[Task].utf8(s"redis://$host").toScopedZIO
       config <- ZIO.service[ConfigService]
     } yield RedisDomainsService(redis, config))
 
