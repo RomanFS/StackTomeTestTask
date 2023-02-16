@@ -47,6 +47,7 @@ lazy val dependencies = Seq(
   libraryDependencies ++= Seq(
     "dev.zio" %% "zio" % zioVersion,
     "dev.zio" %% "zio-streams" % zioVersion,
+    "dev.zio" %% "zio-logging" % "2.1.9",
     "dev.zio" %% "zio-kafka" % "2.0.7",
     "dev.zio" %% "zio-interop-cats" % "23.0.0.1",
     "dev.zio" %% "zio-config" % configVersion,

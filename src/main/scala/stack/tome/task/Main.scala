@@ -1,8 +1,12 @@
 package stack.tome.task
 
-import zio.ZIOAppDefault
+import zio._
+import zio.logging._
 
 object Main extends ZIOAppDefault {
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
+    Runtime.removeDefaultLoggers >>> console(LogFormat.colored, LogLevel.Debug)
+
   lazy val run =
     Program.start
 
@@ -21,7 +25,7 @@ object Main extends ZIOAppDefault {
   //  + service has to pull data every 5 minutes
   //  + on service termination (or job completion) save reviews counts
   //  + add basic http server to handle a data request
-  //  - error handling
+  //  + error handling / logging
 
   // config:
   //  + session token

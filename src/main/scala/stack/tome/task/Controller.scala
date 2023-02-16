@@ -20,10 +20,14 @@ case class Controller(
     ZonedDateTime.now(Clock.systemUTC()).minus(Duration.ofMillis(configService.updateInterval.toMillis))
 
   lazy val start =
-    ( // start http service and schedule job for the Domain data gathering
-      httpService.start <&> collectAndStoreDomainsData(startTime.some)
-        .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
-    ).ensuring(
+    (
+      for {
+        _ <- ZIO.logDebug(s"Setup.configuration: $configService")
+        // start http service and schedule job for the Domain data gathering
+        _ <- httpService.start <&> collectAndStoreDomainsData(startTime.some)
+          .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
+      } yield ()
+      ).ensuring(
       // save data on program exit
       domainsService
         .getAll
@@ -33,6 +37,7 @@ case class Controller(
 
   private def collectAndStoreDomainsData(from: => Option[ZonedDateTime] = None) =
     for {
+      _ <- ZIO.logInfo("Running Controller.collectAndStoreDomainsData")
       reviews <- reviewsService.getReviewsData(from)
       domainTrafficUpdate = reviews
         .map(_._1)

@@ -27,20 +27,22 @@ object DomainsDBService {
       config <- ZIO.service[ConfigService]
     } yield RedisDomainsService(redis, config))
 
-  lazy val fake: ULayer[DomainsDBService] = ZLayer.succeed(new DomainsDBService {
-    println("Fake ReviewCountsDBService is used")
+  lazy val fake: ULayer[DomainsDBService] = ZLayer.fromZIO(
+    ZIO
+      .logWarning("Fake ReviewCountsDBService is used")
+      .as(new DomainsDBService {
+        override def storeDomains(newDomains: Vector[Domain]): Task[Unit] = ZIO.unit
 
-    override def storeDomains(newDomains: Vector[Domain]): Task[Unit] = ZIO.unit
+        override def getDomains: Task[Vector[Domain]] =
+          ZIO.succeed(Vector(Domain("someDomain", DomainInfo())))
 
-    override def getDomains: Task[Vector[Domain]] =
-      ZIO.succeed(Vector(Domain("someDomain", DomainInfo())))
+        override def storeDomainTraffic(domainTraffics: Vector[(String, Int)]): Task[Unit] = ZIO.unit
 
-    override def storeDomainTraffic(domainTraffics: Vector[(String, Int)]): Task[Unit] = ZIO.unit
+        override def getDomainsTraffic(domains: Vector[String]): Task[Vector[(String, Int)]] =
+          Random.nextIntBetween(1000, 100000).map(randTraffic => domains.map(_ -> randTraffic))
 
-    override def getDomainsTraffic(domains: Vector[String]): Task[Vector[(String, Int)]] =
-      Random.nextIntBetween(1000, 100000).map(randTraffic => domains.map(_ -> randTraffic))
-
-  })
+      })
+  )
 
 }
 
@@ -73,21 +75,30 @@ case class RedisDomainsService(redis: RedisCommands[Task, String, String], confi
     for {
       keys <- redis.scan.map(_.keys.toVector)
       values <- keys.traverse(redis.get).map(_.flatMap(_.flatMap(decode[DomainInfo](_).toOption)))
+      _ <- ZIO.logDebug(s"DomainsDBService.getDomains: ${(keys zip values).map(r => Domain(r._1, r._2))}")
     } yield (keys zip values).map(r => Domain(r._1, r._2))
 
   override def storeDomainTraffic(domainTraffics: Vector[(String, Int)]): Task[Unit] =
     domainTraffics
       .traverse {
         case (domain, traffic) =>
-          redis.set(
-            domain + trafficKeyPostfix,
-            traffic.toString,
-            SetArgs(ex = SetArg.Existence.Nx, ttl = SetArg.Ttl.Ex(config.trafficConfig.trafficExpiration.toFinite)),
-          )
+          for {
+            _ <- ZIO.logDebug(s"DomainsDBService.storeDomainTraffic: $domainTraffics")
+            _ <- redis.set(
+              domain + trafficKeyPostfix,
+              traffic.toString,
+              SetArgs(ex = SetArg.Existence.Nx, ttl = SetArg.Ttl.Ex(config.trafficConfig.trafficExpiration.toFinite)),
+            )
+          } yield ()
       }
       .as(ZIO.unit)
 
   override def getDomainsTraffic(domains: Vector[String]): Task[Vector[(String, Int)]] =
-    domains.flatTraverse(domain => redis.get(domain + trafficKeyPostfix).map(_.map(_.toInt).map(domain -> _).toVector))
+    for {
+      _ <- ZIO.logDebug(s"DomainsDBService.getDomainsTraffic: $domains")
+      result <- domains.flatTraverse(domain =>
+        redis.get(domain + trafficKeyPostfix).map(_.map(_.toInt).map(domain -> _).toVector)
+      )
+    } yield result
 
 }

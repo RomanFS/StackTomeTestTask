@@ -14,10 +14,14 @@ import zio.interop.catz._
 
 case class HttpService(domainsService: DomainsService, domainsDBService: DomainsDBService, config: ConfigService)
     extends Http4sDsl[Task] {
-  private lazy val helloWorldService = HttpRoutes
+  private lazy val domainsRoute = HttpRoutes
     .of[Task] {
       case GET -> Root / "domains" =>
-        Ok(getResponse)
+        for {
+          _ <- ZIO.logDebug("/domains is called")
+          response <- Ok(getResponse)
+          _ <- ZIO.logDebug(s"/domains returns $response")
+        } yield response
     }
     .orNotFound
 
@@ -67,7 +71,7 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
       .default[Task]
       .withHost(ipv4"0.0.0.0")
       .withPort(port"8080")
-      .withHttpApp(helloWorldService)
+      .withHttpApp(domainsRoute)
       .build
       .use(_ => ZIO.never)
 

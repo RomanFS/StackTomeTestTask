@@ -20,7 +20,10 @@ object DomainsService {
         .map(reviewCountsRef =>
           new DomainsService {
             override def getAll: Task[Vector[Domain]] =
-              reviewCountsRef.get.map(_.toVector.map(r => Domain(r._1, r._2)))
+              for {
+                result <- reviewCountsRef.get.map(_.toVector.map(r => Domain(r._1, r._2)))
+                _ <- ZIO.logDebug(s"DomainsService.getAll: $result")
+              } yield result
 
             override def addOrSet(newDomainInfo: Domain): Task[Unit] =
               for {
@@ -34,7 +37,7 @@ object DomainsService {
                   reviewCounts.put(newDomainInfo.name, newInfo)
                   reviewCounts
                 }
-                _ <- getAll
+                _ <- ZIO.logDebug(s"DomainsService.addOrSet: $newDomainInfo")
               } yield ()
 
             override def deleteAll: Task[Unit] =
@@ -43,10 +46,5 @@ object DomainsService {
           }
         )
     )
-
-  def getAll = ZIO.serviceWithZIO[DomainsService](_.getAll)
-  def addOrSet(newDomainInfo: Domain) =
-    ZIO.serviceWithZIO[DomainsService](_.addOrSet(newDomainInfo))
-  def removeAll = ZIO.serviceWithZIO[DomainsService](_.deleteAll)
 
 }

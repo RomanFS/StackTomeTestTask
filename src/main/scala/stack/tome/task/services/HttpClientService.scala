@@ -5,7 +5,6 @@ import org.http4s.ember.client.EmberClientBuilder
 import zio._
 import zio.interop.catz._
 
-// TODO: add config
 trait HttpClientService {
   def apply[A](f: Client[Task] => Task[A]): Task[A]
 
