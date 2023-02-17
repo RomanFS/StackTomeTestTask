@@ -17,6 +17,9 @@ lazy val root =
     .settings(name := "StackTome")
     .settings(commonSettings)
     .settings(dependencies)
+    .settings(
+      testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+    )
 
 lazy val commonSettings = {
   lazy val commonScalacOptions = Seq(
@@ -47,6 +50,10 @@ lazy val dependencies = Seq(
   libraryDependencies ++= Seq(
     "dev.zio" %% "zio" % zioVersion,
     "dev.zio" %% "zio-streams" % zioVersion,
+    "dev.zio" %% "zio-concurrent" % zioVersion,
+    "dev.zio" %% "zio-test" % zioVersion % Test,
+    "dev.zio" %% "zio-test-sbt" % zioVersion % Test,
+    "dev.zio" %% "zio-test-magnolia" % zioVersion % Test,
     "dev.zio" %% "zio-logging" % "2.1.9",
     "dev.zio" %% "zio-kafka" % "2.0.7",
     "dev.zio" %% "zio-interop-cats" % "23.0.0.1",

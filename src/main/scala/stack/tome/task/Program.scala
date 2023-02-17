@@ -12,7 +12,7 @@ object Program {
         HttpService.make,
         ConfigService.layer,
         ReviewsService.layer,
-        TrafficService.layer,
+        TrafficService.fakeLayer,
         DomainsService.layer,
         HttpClientService.live,
         DomainsDBService.redisLive,

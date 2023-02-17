@@ -1,13 +1,15 @@
 package stack.tome.task.services
 
-import stack.tome.task.models.{ Domain, DomainInfo }
+import cats.implicits.catsSyntaxOptionId
+import stack.tome.task.models._
 import zio._
-
-import scala.collection.mutable
+import zio.concurrent.ConcurrentMap
 
 trait DomainsService {
   def getAll: Task[Vector[Domain]]
+
   def addOrSet(newDomainInfo: Domain): Task[Unit]
+
   def deleteAll: Task[Unit]
 
 }
@@ -15,33 +17,37 @@ trait DomainsService {
 object DomainsService {
   lazy val layer: ZLayer[DomainsDBService, Throwable, DomainsService] =
     ZLayer.fromZIO(
-      Ref
-        .make(mutable.Map[String, DomainInfo]())
-        .map(reviewCountsRef =>
+      ConcurrentMap
+        .empty[String, DomainInfo]
+        .map(reviewCountsMap =>
           new DomainsService {
             override def getAll: Task[Vector[Domain]] =
               for {
-                result <- reviewCountsRef.get.map(_.toVector.map(r => Domain(r._1, r._2)))
+                result <- reviewCountsMap.toList.map(_.map(r => Domain(r._1, r._2)))
                 _ <- ZIO.logDebug(s"DomainsService.getAll: $result")
-              } yield result
+              } yield result.toVector
 
             override def addOrSet(newDomainInfo: Domain): Task[Unit] =
               for {
-                _ <- reviewCountsRef.update { reviewCounts =>
-                  val storedValue = reviewCounts.getOrElse(newDomainInfo.name, DomainInfo())
-                  val newInfo = storedValue
-                    .copy(
-                      storedValue.reviewsCount + newDomainInfo.info.reviewsCount,
-                      newDomainInfo.info.newestReview orElse storedValue.newestReview,
-                    )
-                  reviewCounts.put(newDomainInfo.name, newInfo)
-                  reviewCounts
-                }
+                _ <- reviewCountsMap.compute(
+                  newDomainInfo.name,
+                  (_, oldInfoOp) =>
+                    oldInfoOp match {
+                      case Some(oldInfo) =>
+                        oldInfo
+                          .copy(
+                            oldInfo.reviewsCount + newDomainInfo.info.reviewsCount,
+                            newDomainInfo.info.newestReview orElse oldInfo.newestReview,
+                          )
+                          .some
+                      case None => newDomainInfo.info.some
+                    },
+                )
                 _ <- ZIO.logDebug(s"DomainsService.addOrSet: $newDomainInfo")
               } yield ()
 
             override def deleteAll: Task[Unit] =
-              reviewCountsRef.set(mutable.Map())
+              reviewCountsMap.removeIf((_, _) => true)
 
           }
         )

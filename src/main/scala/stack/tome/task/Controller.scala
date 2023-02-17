@@ -27,7 +27,7 @@ case class Controller(
         _ <- httpService.start <&> collectAndStoreDomainsData(startTime.some)
           .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
       } yield ()
-      ).ensuring(
+    ).ensuring(
       (for {
         domainsData <- domainsService.getAll
         _ <- domainsDBService.storeDomains(domainsData)

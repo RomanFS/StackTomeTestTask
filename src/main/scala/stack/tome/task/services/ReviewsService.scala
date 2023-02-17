@@ -68,8 +68,8 @@ object ReviewsService {
         )
 
       override def getReviewsData(
-                                   from: Option[ZonedDateTime] = None
-                                 ): ZIO[Any, Throwable, Vector[(String, Review)]] =
+          from: Option[ZonedDateTime] = None
+      ): ZIO[Any, Throwable, Vector[(String, Review)]] =
         for {
           domains <- parseDomainsData
           result <- ZIO.absolve(
@@ -104,8 +104,8 @@ object ReviewsService {
         .logWarning("Fake Reviews Service is used")
         .as(new ReviewsService {
           override def getReviewsData(
-                                       from: Option[ZonedDateTime] = None
-                                     ): ZIO[Any, Throwable, Vector[(String, Review)]] =
+              from: Option[ZonedDateTime] = None
+          ): ZIO[Any, Throwable, Vector[(String, Review)]] =
             ZIO.succeed(Vector())
 
         })
