@@ -20,7 +20,11 @@ case class Controller(
     (
       for {
         _ <- ZIO.logDebug(s"Setup.configuration: $configService")
-        startTime <- Clock.currentTime(TimeUnit.SECONDS)
+        startTime <- Clock
+          .instant
+          .map(
+            _.minusMillis(configService.updateInterval.toMillis).getEpochSecond
+          )
         // start http service and schedule job for the Domain data gathering
         _ <- httpService.start <&> collectAndStoreDomainsData(startTime.some)
           .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))

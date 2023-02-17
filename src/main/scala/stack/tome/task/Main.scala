@@ -5,7 +5,7 @@ import zio.logging._
 
 object Main extends ZIOAppDefault {
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] =
-    Runtime.removeDefaultLoggers >>> console(logLevel = LogLevel.Info)
+    Runtime.removeDefaultLoggers >>> console(logLevel = LogLevel.Debug)
 
   lazy val run =
     Program.start
