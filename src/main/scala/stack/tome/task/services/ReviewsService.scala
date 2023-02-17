@@ -5,16 +5,14 @@ import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.http4s._
-import org.http4s.implicits.http4sLiteralsSyntax
 import stack.tome.task.models.Review
 import zio._
 import zio.interop.catz._
 
-import java.time.ZonedDateTime
 import scala.util.chaining.scalaUtilChainingOps
 
 trait ReviewsService {
-  def getReviewsData(from: Option[ZonedDateTime] = None): ZIO[Any, Throwable, Vector[(String, Review)]]
+  def getReviewsData(from: Option[Long] = None): ZIO[Any, Throwable, Vector[(String, Review)]]
 
 }
 
@@ -67,9 +65,7 @@ object ReviewsService {
             .traverse(_.headOption.flatMap(_.asArray).toVector.flatten.map(_.as[Review].toOption.get))
         )
 
-      override def getReviewsData(
-          from: Option[ZonedDateTime] = None
-      ): ZIO[Any, Throwable, Vector[(String, Review)]] =
+      override def getReviewsData(from: Option[Long] = None): ZIO[Any, Throwable, Vector[(String, Review)]] =
         for {
           domains <- parseDomainsData
           result <- ZIO.absolve(
@@ -86,7 +82,8 @@ object ReviewsService {
                   case Some(fromDate) =>
                     reviewsData.filter(_ match {
                       case Left(_) => false
-                      case Right((_, review)) => review.date.createdAt.isAfter(fromDate)
+                      case Right((_, review)) =>
+                        review.date.createdAt.toEpochSecond > fromDate
                     })
                   case None => reviewsData
                 }
@@ -104,13 +101,13 @@ object ReviewsService {
         .logWarning("Fake Reviews Service is used")
         .as(new ReviewsService {
           override def getReviewsData(
-              from: Option[ZonedDateTime] = None
+              from: Option[Long] = None
           ): ZIO[Any, Throwable, Vector[(String, Review)]] =
             ZIO.succeed(Vector())
 
         })
     )
 
-  def getReviewsData(from: Option[ZonedDateTime] = None) = ZIO.serviceWithZIO[ReviewsService](_.getReviewsData(from))
+  def getReviewsData(from: Option[Long] = None) = ZIO.serviceWithZIO[ReviewsService](_.getReviewsData(from))
 
 }

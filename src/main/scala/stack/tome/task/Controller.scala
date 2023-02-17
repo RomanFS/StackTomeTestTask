@@ -6,7 +6,7 @@ import stack.tome.task.services._
 import zio.{ Duration => ZDuration, _ }
 import zio.interop.catz._
 
-import java.time.{ Clock, _ }
+import java.util.concurrent.TimeUnit
 
 case class Controller(
     httpService: HttpService,
@@ -16,13 +16,11 @@ case class Controller(
     domainsDBService: DomainsDBService,
     configService: ConfigService,
 ) {
-  def startTime =
-    ZonedDateTime.now(Clock.systemUTC()).minus(Duration.ofMillis(configService.updateInterval.toMillis))
-
   lazy val start =
     (
       for {
         _ <- ZIO.logDebug(s"Setup.configuration: $configService")
+        startTime <- Clock.currentTime(TimeUnit.SECONDS)
         // start http service and schedule job for the Domain data gathering
         _ <- httpService.start <&> collectAndStoreDomainsData(startTime.some)
           .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
@@ -35,7 +33,7 @@ case class Controller(
       } yield ()).orDie
     )
 
-  private def collectAndStoreDomainsData(from: => Option[ZonedDateTime] = None) =
+  private def collectAndStoreDomainsData(from: => Option[Long] = None) =
     for {
       _ <- ZIO.logInfo("Running Controller.collectAndStoreDomainsData")
       reviews <- reviewsService.getReviewsData(from)

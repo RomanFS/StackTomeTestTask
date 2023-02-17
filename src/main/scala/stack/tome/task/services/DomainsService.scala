@@ -53,4 +53,18 @@ object DomainsService {
         )
     )
 
+  lazy val fakeLayer: ZLayer[Any, Nothing, DomainsService] =
+    ZLayer.fromZIO(
+      ZIO
+        .logWarning("Fake DomainsService is used")
+        .as(new DomainsService {
+          override def getAll: Task[Vector[Domain]] = ZIO.succeed(Vector())
+
+          override def addOrSet(newDomainInfo: Domain): Task[Unit] = ZIO.unit
+
+          override def deleteAll: Task[Unit] = ZIO.unit
+
+        })
+    )
+
 }
