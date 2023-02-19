@@ -8,6 +8,7 @@ import scala.concurrent.duration.Duration
 
 final case class ConfigService(
     updateInterval: Duration,
+    firstDataCollectTime: Duration,
     maxDomainResponse: Int,
     reviewsConfig: ReviewsConfig,
     trafficConfig: TrafficConfig,
@@ -27,6 +28,7 @@ object ConfigService {
 
   val general =
     duration("update_interval").default(5, TimeUnit.MINUTES) zip
+      duration("first_data_collect_time").default(1, TimeUnit.HOURS) zip
       int("max_domain_response").default(10)
 
   val configuration =

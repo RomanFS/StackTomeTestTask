@@ -3,10 +3,8 @@ package stack.tome.task
 import cats.implicits._
 import stack.tome.task.models._
 import stack.tome.task.services._
-import zio.{ Duration => ZDuration, _ }
+import zio._
 import zio.interop.catz._
-
-import java.util.concurrent.TimeUnit
 
 case class Controller(
     httpService: HttpService,
@@ -25,9 +23,12 @@ case class Controller(
           .map(
             _.minusMillis(configService.updateInterval.toMillis).getEpochSecond
           )
+        // collect the older data from N minutes ago (specified in config)
+        _ <- collectAndStoreDomainsData(configService.firstDataCollectTime.toSeconds.some)
         // start http service and schedule job for the Domain data gathering
         _ <- httpService.start <&> collectAndStoreDomainsData(startTime.some)
-          .repeat(Schedule.fixed(ZDuration(configService.updateInterval.length, configService.updateInterval.unit)))
+          .delay(Duration.fromScala(configService.updateInterval))
+          .repeat(Schedule.fixed(Duration.fromScala(configService.updateInterval)))
       } yield ()
     ).ensuring(
       (for {
@@ -37,7 +38,7 @@ case class Controller(
       } yield ()).orDie
     )
 
-  private def collectAndStoreDomainsData(from: => Option[Long] = None) =
+  private def collectAndStoreDomainsData(from: => Option[Long]) =
     for {
       _ <- ZIO.logInfo("Running Controller.collectAndStoreDomainsData")
       reviews <- reviewsService.getReviewsData(from)

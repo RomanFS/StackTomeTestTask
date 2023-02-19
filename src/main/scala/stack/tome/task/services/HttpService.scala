@@ -7,6 +7,7 @@ import io.circe.syntax._
 import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.ember.server._
+import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
 import stack.tome.task.models._
 import zio._
@@ -19,7 +20,7 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
       case GET -> Root / "domains" =>
         for {
           _ <- ZIO.logDebug("/domains is called")
-          response <- Ok(getResponse)
+          response <- Ok(getResponse).map(_.withContentType(`Content-Type`(MediaType.application.`json`)))
           _ <- ZIO.logDebug(s"/domains returns $response")
         } yield response
     }
