@@ -13,12 +13,12 @@ final case class ConfigService(
     reviewsConfig: ReviewsConfig,
     trafficConfig: TrafficConfig,
 )
-final case class ReviewsConfig(domainsUrl: String, reviewsUrl: String)
+final case class ReviewsConfig(categoriesUrl: String, reviewsUrl: String)
 final case class TrafficConfig(trafficDomain: String, sessionToken: String, trafficExpiration: Duration)
 
 object ConfigService {
   val reviews =
-    (string("domains_url") zip string("reviews_url")).to[ReviewsConfig]
+    (string("categories_url") zip string("reviews_url")).to[ReviewsConfig]
 
   val traffic =
     (string("traffic_domain") zip string("session_token") zip

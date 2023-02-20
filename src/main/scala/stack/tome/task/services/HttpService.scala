@@ -57,10 +57,7 @@ case class HttpService(domainsService: DomainsService, domainsDBService: Domains
             _.flatMap {
               case (domainName, traffic) => domains.find(_.name == domainName).map(DomainWithTraffic(_, traffic))
             }
-              .sortBy(_.traffic)
-              .sortWith {
-                case (d1, d2) => d1.domain.compareReviewsDates(d2.domain)
-              }
+              .sortBy(r => (-r.domain.newReviews, -r.traffic))
               .take(config.maxDomainResponse)
               .asJson
               .noSpaces

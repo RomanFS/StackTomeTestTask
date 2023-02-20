@@ -41,7 +41,12 @@ object DomainsDBService {
         override def storeDomainTraffic(domainTraffics: Vector[(String, Int)]): Task[Unit] = ZIO.unit
 
         override def getDomainsTraffic(domains: Vector[String]): Task[Vector[(String, Int)]] =
-          Random.nextIntBetween(1000, 100000).map(randTraffic => domains.map(_ -> randTraffic))
+          domains
+            .traverse(domain =>
+              Random
+                .nextIntBetween(1000, 100000)
+                .map(domain -> _)
+            )
 
       })
   )

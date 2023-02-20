@@ -21,32 +21,51 @@ object ReviewsService {
     ZLayer.fromZIO(for {
       client <- ZIO.service[HttpClientService]
       config <- ZIO.service[ConfigService]
-      domainsUrl <- ZIO.fromEither(Uri.fromString(config.reviewsConfig.domainsUrl))
+      categoriesUrl <- ZIO.fromEither(Uri.fromString(config.reviewsConfig.categoriesUrl))
       reviewsUrl <- ZIO.fromEither(Uri.fromString(config.reviewsConfig.reviewsUrl))
     } yield new ReviewsService {
-      private lazy val domainsRequest = Request[Task](
-        method = Method.GET,
-        uri = domainsUrl,
-        headers = Headers(),
-      )
+      private lazy val categoriesRequest = Request[Task](uri = categoriesUrl)
 
-      private def recentReviewsRequest(reviewsId: String): Request[Task] = Request[Task](
-        method = Method.GET,
-        uri = (reviewsUrl / reviewsId / Uri.Path.Segment("reviews")).withQueryParam("locale", "en-US"),
-        headers = Headers(),
-      )
+      private def domainsRequest(category: String) =
+        Request[Task](uri =
+          (categoriesUrl / Uri.Path.Segment(category))
+            .withQueryParam("sort", "latest_review")
+        )
 
-      private def parseDomainsData: Task[Iterator[(String, String)]] =
+      private def recentReviewsRequest(reviewsId: String): Request[Task] =
+        Request[Task](uri =
+          (reviewsUrl / reviewsId / Uri.Path.Segment("reviews"))
+            .withQueryParam("locale", "en-US")
+        )
+
+      private def parseCategories: Task[Vector[String]] =
         client(c =>
           for {
             result <- c
-              .expect[String](domainsRequest)
+              .expect[String](categoriesUrl)
+              .map(
+                "(?<=/categories/)[A-z-]+"
+                  .r
+                  .findAllIn(_)
+              )
+            _ <- ZIO.logDebug(s"ReviewsService.parseCategories: ${result.toVector}")
+          } yield result
+            .distinct
+            .toVector
+        )
+
+      private def parseDomainsData(category: String): Task[Iterator[(String, String)]] =
+        client(c =>
+          for {
+            _ <- ZIO.logInfo(s"ReviewsService.parseDomainsData: parsing data for a category $category")
+            result <- c
+              .expect[String](domainsRequest(category))
               .map(
                 "(?<=href=\"/review/)[^\"]+|(?<=latest-reviews-)[^-]+"
                   .r
                   .findAllIn(_)
               )
-            _ <- ZIO.logDebug(s"ReviewsService.parseDomainsData: $result")
+            _ <- ZIO.logDebug(s"ReviewsService.parseDomainsData category \"$category\": ${result.toVector}")
           } yield result
             .distinct
             .sliding(2, 2)
@@ -54,28 +73,37 @@ object ReviewsService {
             .filter(_._2.lengthCompare(24) == 0)
         )
 
-      private def getReviews(reviewsId: String): Task[Vector[Either[ParsingFailure, Review]]] =
+      private def getReviews(reviewsId: String): Task[Vector[Either[Throwable, Review]]] =
         client(c =>
           for {
             result <- c.expect[String](recentReviewsRequest(reviewsId))
-            _ <- ZIO.logDebug(s"ReviewsService.getReviews: $result")
+            _ <- ZIO.logDebug(s"ReviewsService.getReviews reviewsId \"$reviewsId\": $result")
           } yield result
             .pipe(parse)
             .map(_ \\ "reviews")
-            .traverse(_.headOption.flatMap(_.asArray).toVector.flatten.map(_.as[Review].toOption.get))
-        )
+            .traverse(
+              _.headOption
+                .flatMap(_.asArray)
+                .toVector
+                .flatten
+                .map(_.as[Review].toOption.get)
+            )
+        ).retryN(3).catchAll(e => ZIO.logWarning(e.getMessage).as(Vector(Left(e))))
 
       override def getReviewsData(from: Option[Long] = None): ZIO[Any, Throwable, Vector[(String, Review)]] =
         for {
-          domains <- parseDomainsData
-          result <- ZIO.absolve(
+          categories <- parseCategories
+          _ <- ZIO.logInfo(s"ReviewsService.getReviewsData: categories parsed at total of ${categories.length}")
+          domains <- categories
+            .parTraverse(parseDomainsData)
+            .map(_.flatten)
+          result <-
             domains
-              .take(config.maxDomainResponse)
               .toVector
-              .flatTraverse {
+              .parFlatTraverse {
                 case (domain, reviewsId) =>
                   getReviews(reviewsId)
-                    .map(_.map(_.leftMap(e => new Throwable(e.message)).map(domain -> _)))
+                    .map(_.map(_.map(domain -> _)))
               }
               .map { reviewsData =>
                 from match {
@@ -89,8 +117,8 @@ object ReviewsService {
                 }
               }
               .map(_.sequence)
-          )
-          _ <- ZIO.logDebug(s"ReviewsService.getReviewsData: $result")
+              .flatMap(r => ZIO.fromEither(r))
+          _ <- ZIO.logInfo(s"ReviewsService.getReviewsData: $result")
         } yield result
 
     })
