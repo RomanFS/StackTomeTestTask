@@ -1,7 +1,6 @@
 package stack.tome.task.services
 
 import cats.implicits._
-import io.circe._
 import io.circe.generic.auto._
 import io.circe.parser._
 import org.http4s._
@@ -9,7 +8,9 @@ import stack.tome.task.models.Review
 import zio._
 import zio.interop.catz._
 
+import scala.collection.mutable
 import scala.util.chaining.scalaUtilChainingOps
+import scala.util.matching.Regex
 
 trait ReviewsService {
   def getReviewsData(from: Option[Long] = None): ZIO[Any, Throwable, Vector[(String, Review)]]
@@ -24,8 +25,6 @@ object ReviewsService {
       categoriesUrl <- ZIO.fromEither(Uri.fromString(config.reviewsConfig.categoriesUrl))
       reviewsUrl <- ZIO.fromEither(Uri.fromString(config.reviewsConfig.reviewsUrl))
     } yield new ReviewsService {
-      private lazy val categoriesRequest = Request[Task](uri = categoriesUrl)
-
       private def domainsRequest(category: String) =
         Request[Task](uri =
           (categoriesUrl / Uri.Path.Segment(category))
@@ -54,23 +53,57 @@ object ReviewsService {
             .toVector
         )
 
-      private def parseDomainsData(category: String): Task[Iterator[(String, String)]] =
+      private case class DomainData(reviewId: String = "", domainCategories: List[String] = Nil)
+
+      private def groupDomainsResponseData(matchedResponse: List[Regex.Match]) = {
+        val hashMap = mutable.HashMap[String, DomainData]()
+        var currentDomain = ""
+
+        matchedResponse.foreach(r =>
+          if (r.group(1) != null)
+            currentDomain = r.group(1)
+          else if (currentDomain.nonEmpty) {
+            val currOp = hashMap.get(currentDomain)
+            if (r.group(2) != null)
+              currOp match {
+                case Some(currValue) => hashMap.update(currentDomain, currValue.copy(reviewId = r.group(2)))
+                case None => hashMap.put(currentDomain, DomainData(reviewId = r.group(2)))
+              }
+            else if (r.group(3) != null)
+              currOp match {
+                case Some(currValue) =>
+                  hashMap.update(
+                    currentDomain,
+                    currValue.copy(domainCategories = currValue.domainCategories :+ r.group(3)),
+                  )
+
+                case None => hashMap.put(currentDomain, DomainData(domainCategories = List(r.group(3))))
+
+              }
+          }
+        )
+
+        hashMap
+          .filter(_._2.domainCategories.exists(_.toLowerCase.contains("store")))
+          .map(r => r._1 -> r._2.reviewId)
+          .toVector
+      }
+
+      private def parseDomainsData(category: String): Task[Vector[(String, String)]] =
         client(c =>
           for {
             _ <- ZIO.logInfo(s"ReviewsService.parseDomainsData: parsing data for a category $category")
             result <- c
               .expect[String](domainsRequest(category))
-              .map(
-                "(?<=href=\"/review/)[^\"]+|(?<=latest-reviews-)[^-]+"
+              .map { response =>
+                "(?<=href=\"/review/)([^\"]+)|(?<=latest-reviews-)([^-]+)|(?<=AAY17\">)([\\w\\s]+)"
                   .r
-                  .findAllIn(_)
-              )
-            _ <- ZIO.logDebug(s"ReviewsService.parseDomainsData category \"$category\": ${result.toVector}")
-          } yield result
-            .distinct
-            .sliding(2, 2)
-            .map(l => (l.head, l.last))
-            .filter(_._2.lengthCompare(24) == 0)
+                  .findAllIn(response)
+                  .matchData
+                  .toList
+              }
+            _ <- ZIO.logDebug(s"ReviewsService.parseDomainsData category \"$category\": $result")
+          } yield result.pipe(groupDomainsResponseData)
         )
 
       private def getReviews(reviewsId: String): Task[Vector[Either[Throwable, Review]]] =
@@ -95,11 +128,11 @@ object ReviewsService {
           categories <- parseCategories
           _ <- ZIO.logInfo(s"ReviewsService.getReviewsData: categories parsed at total of ${categories.length}")
           domains <- categories
+            .take(3)
             .parTraverse(parseDomainsData)
             .map(_.flatten)
           result <-
             domains
-              .toVector
               .parFlatTraverse {
                 case (domain, reviewsId) =>
                   getReviews(reviewsId)
